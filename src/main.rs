@@ -126,7 +126,7 @@ impl Output {
         let screen_columns = self.win_size.0;
         for i in 0..screen_rows {
             if i == screen_rows / 3 {
-                let mut welcome = format!("Smartt Editor --- Version {}", VERSION);
+                let mut welcome = format!("Jolah-Smartt Coder Editor --- Version {}", VERSION);
                 if welcome.len() > screen_columns {
                     welcome.truncate(screen_columns)
                 }
