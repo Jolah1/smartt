@@ -12,11 +12,35 @@ impl Drop for CleanUp {
     }
 }
 
-struct Output;
+struct EditorsContents {
+    content: String,
+}
+
+impl EditorContents {
+    fn new() -> Self {
+        Self {
+            content: String::new(),
+        }
+    }
+
+    fn push(&mut self, ch: char) {
+        self.content.push(ch)
+    }
+
+    fn push_str(&mut self, string: &str) {
+        self.content.push_str(string)
+    }
+}
+struct Output {
+    win_size: (usize, usize),
+}
 
 impl Output {
     fn new() -> Self {
-        Self
+        let win_size = terminal::size()
+            .map(|(x, y)| (x as usize, y as usize))
+            .unwrap();
+        Self { win_size }
     }
 
     fn clear_screen() -> crossterm::Result<()> {
@@ -25,8 +49,13 @@ impl Output {
     }
 
     fn draw_rows(&self) {
-        for _ in 0..24 {
-            println!("~\r");
+        let screen_rows = self.win_size.1;
+        for i in 0..screen_rows {
+            println!("~");
+            if i < screen_rows - 1 {
+                println!("\r")
+            }
+            stdout().flush();
         }
     }
 
