@@ -1,8 +1,11 @@
 use crossterm::event::*;
 use crossterm::terminal::ClearType;
 use crossterm::{cursor, event, execute, queue, terminal};
-use std::io::stdout;
+use std::io;
+use std::io::{stdout, Write};
 use std::time::Duration;
+
+const VERSION: &str = "0.1.0";
 
 struct CleanUp;
 
@@ -11,9 +14,38 @@ impl Drop for CleanUp {
         terminal::disable_raw_mode().expect("Unable to disable raw mode")
     }
 }
+struct CursorController {
+    cursor_x: usize,
+    cursor_y: usize,
+}
+
+impl CursorController {
+    fn new() -> CursorController {
+        Self {
+            cursor_x: 0,
+            cursor_y: 0,
+        }
+    }
+}
 
 struct EditorContents {
     content: String,
+}
+
+impl EditorContents {
+    fn new() -> Self {
+        EditorContents {
+            content: String::new(),
+        }
+    }
+
+    fn push(&mut self, c: char) {
+        self.content.push(c);
+    }
+
+    fn push_str(&mut self, s: &str) {
+        self.content.push_str(s);
+    }
 }
 
 impl io::Write for EditorContents {
@@ -37,6 +69,7 @@ impl io::Write for EditorContents {
 struct Output {
     win_size: (usize, usize),
     editor_contents: EditorContents,
+    cursor_controller: CursorController,
 }
 
 impl Output {
@@ -47,6 +80,7 @@ impl Output {
         Self {
             win_size,
             editor_contents: EditorContents::new(),
+            cursor_controller: CursorController::new(),
         }
     }
 
@@ -70,9 +104,8 @@ impl Output {
                     self.editor_contents.push('~');
                     padding -= 1
                 }
-                (0..padding).for_each(|_| self.editor_contents.push (''));
+                (0..padding).for_each(|_| self.editor_contents.push(' '));
                 self.editor_contents.push_str(&welcome);
-
             } else {
                 self.editor_contents.push('~');
             }
@@ -91,7 +124,15 @@ impl Output {
     fn refresh_screen(&mut self) -> crossterm::Result<()> {
         queue!(self.editor_contents, cursor::Hide, cursor::MoveTo(0, 0))?;
         self.draw_rows();
-        queue!(self.editor_contents, cursor::MoveTo(0, 0), cursor::Show)?;
+
+        let cursor_x = self.cursor_controller.cursor_x;
+        let cursor_y = self.cursor_controller.cursor_y;
+
+        queue!(
+            self.editor_contents,
+            cursor::MoveTo(cursor_x as u16, cursor_y as u16),
+            cursor::Show
+        )?;
         self.editor_contents.flush()
     }
 }
