@@ -26,6 +26,24 @@ impl CursorController {
             cursor_y: 0,
         }
     }
+
+    fn move_cursor(&mut self, direction: KeyCode) {
+        match direction {
+            KeyCode::Up => {
+                self.cursor_y -= 1;
+            }
+            KeyCode::Left => {
+                self.cursor_x -= 1;
+            }
+            KeyCode::Down => {
+                self.cursor_y += 1;
+            }
+            KeyCode::Right => {
+                self.cursor_x += 1;
+            }
+            _ => unimplemented!(),
+        }
+    }
 }
 
 struct EditorContents {
@@ -135,6 +153,10 @@ impl Output {
         )?;
         self.editor_contents.flush()
     }
+
+    fn move_cursor(&mut self, direction: KeyCode) {
+        self.cursor_controller.move_cursor(direction);
+    }
 }
 struct Reader;
 
@@ -163,12 +185,17 @@ impl Editor {
         }
     }
 
-    fn process_keypress(&self) -> crossterm::Result<bool> {
+    fn process_keypress(&mut self) -> crossterm::Result<bool> {
         match self.reader.read_key()? {
             KeyEvent {
                 code: KeyCode::Char('q'),
                 modifiers: event::KeyModifiers::CONTROL,
             } => return Ok(false),
+
+            KeyEvent {
+                code: direction @ (KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right),
+                modifiers: KeyModifiers::NONE,
+            } => self.output.move_cursor(direction),
             _ => {}
         }
         Ok(true)
