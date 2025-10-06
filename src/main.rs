@@ -1,9 +1,10 @@
 use crossterm::event::*;
 use crossterm::terminal::ClearType;
 use crossterm::{cursor, event, execute, queue, terminal};
-use std::io;
 use std::io::{stdout, Write};
+use std::path::Path;
 use std::time::Duration;
+use std::{cmp, env, fs, io};
 
 const VERSION: &str = "0.1.0";
 
@@ -14,6 +15,39 @@ impl Drop for CleanUp {
         terminal::disable_raw_mode().expect("Unable to disable raw mode")
     }
 }
+
+struct EditorRows {
+    row_contents: Vec<Box<str>>,
+}
+
+impl EditorRows {
+    fn new() -> Self {
+        let mut arg = env::args();
+
+        match arg.nth(1) {
+            None => Self {
+                row_contents: Vec::new(),
+            },
+            Some(file) => Self::from_file(file.as_ref()),
+        }
+    }
+
+    fn from_file(file: &Path) -> Self {
+        let file_contents = fs::read_to_string(file).expect("Unable to read file");
+        Self {
+            row_contents: file_contents.lines().map(|it| it.into()).collect(),
+        }
+    }
+
+    fn number_of_rows(&self) -> usize {
+        self.row_contents.len()
+    }
+
+    fn get_row(&self, at: usize) -> &str {
+        &self.row_contents[at]
+    }
+}
+
 struct CursorController {
     cursor_x: usize,
     cursor_y: usize,
@@ -100,6 +134,7 @@ impl io::Write for EditorContents {
 }
 struct Output {
     win_size: (usize, usize),
+    editor_rows: EditorRows,
     editor_contents: EditorContents,
     cursor_controller: CursorController,
 }
@@ -111,6 +146,7 @@ impl Output {
             .unwrap();
         Self {
             win_size,
+            editor_rows: EditorRows::new(),
             editor_contents: EditorContents::new(),
             cursor_controller: CursorController::new(win_size),
         }
@@ -125,21 +161,27 @@ impl Output {
         let screen_rows = self.win_size.1;
         let screen_columns = self.win_size.0;
         for i in 0..screen_rows {
-            if i == screen_rows / 3 {
-                let mut welcome = format!("Jolah-Smartt Coder Editor --- Version {}", VERSION);
-                if welcome.len() > screen_columns {
-                    welcome.truncate(screen_columns)
-                }
+            if i >= self.editor_rows.number_of_rows() {
+                if self.editor_rows.number_of_rows() == 0 && i == screen_rows / 3 {
+                    let mut welcome = format!("Jolah-Smartt Editor --- Version {}", VERSION);
+                    if welcome.len() > screen_columns {
+                        welcome.truncate(screen_columns)
+                    }
 
-                let mut padding = (screen_columns - welcome.len()) / 2;
-                if padding != 0 {
+                    let mut padding = (screen_columns - welcome.len()) / 2;
+                    if padding != 0 {
+                        self.editor_contents.push('~');
+                        padding -= 1
+                    }
+                    (0..padding).for_each(|_| self.editor_contents.push(' '));
+                    self.editor_contents.push_str(&welcome);
+                } else {
                     self.editor_contents.push('~');
-                    padding -= 1
                 }
-                (0..padding).for_each(|_| self.editor_contents.push(' '));
-                self.editor_contents.push_str(&welcome);
             } else {
-                self.editor_contents.push('~');
+                let len = cmp::min(self.editor_rows.get_row(i).len(), screen_columns);
+                self.editor_contents
+                    .push_str(&self.editor_rows.get_row(i)[..len])
             }
 
             queue!(
